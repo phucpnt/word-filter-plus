@@ -210,9 +210,11 @@ if (!class_exists('WordFilter')) {
                 $i = 'i';
 
             $original = ( $use_regex == 'yes' ) ? $original : preg_quote($original, '/');
+
             require_once(dirname(__FILE__) . '/pwp-filter-plus.php');
             $result   = PWP_FilterPlus::getInstance()->doReplacement($original, $replacement, $string, $b, $i);
-            if ($result === FALSE) {
+
+            if (false === $result) {
                 return preg_replace("/$b$original$b/$i", $replacement, $string);
             }
             else{

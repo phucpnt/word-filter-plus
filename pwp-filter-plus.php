@@ -27,8 +27,9 @@
   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.* */
 class PWP_FilterPlus {
 
-    private static $_INSTANCE = NULL;
-    private $assignCat = NULL;
+    private static $_INSTANCE             = NULL;
+    private $assignCat             = NULL;
+    private $shortCodeReplacements = array();
 
     const SC_PFPLUS = 'wfp';
 
@@ -43,67 +44,48 @@ class PWP_FilterPlus {
         return self::$_INSTANCE;
     }
 
-    public function doReplacement($original, $replacement, $string, $b='', $i='') {
-        $replacement = do_shortcode($replacement);
-        $count       = 0;
-        $result      = preg_replace("/{$b}{$original}{$b}/$i", $replacement, $string, -1, $count);
-        if ($count > 0) {
-            if ($this->assignCat !== NULL) {
-                wp_set_post_categories($this->assignCat['postid'], $this->assignCat['cats']);
-                $this->assignCat = NULL;
+    public function doReplacement($original, $replacement, $string, $b = '', $i = '') {
+        if (strpos($replacement, '[' . self::SC_PFPLUS) === 0) {
+            if (isset($this->shortCodeReplacements[$replacement])) {
+                $newReplace = $this->shortCodeReplacements[$replacement];
+            } else {
+                $newReplace = json_decode(do_shortcode($replacement), true);
+                $this->shortCodeReplacements[$replacement] = $newReplace;
             }
-            return $result;
         } else {
-            return false;
+            $newReplace = false;
         }
+
+        if ($newReplace) {
+            $count  = 0;
+            $result = preg_replace("/{$b}{$original}{$b}/$i", $newReplace['replacement'], $string, -1, $count);
+            if ($count > 0) {
+                global $post;
+                if (!in_category($newReplace['catid'], $post)) {
+                    wp_set_post_terms($post->ID, array(intval($newReplace['catid'])), 'category', true);
+                }
+                wp_set_post_categories($this->assignCat['postid'], $this->assignCat['cats']);
+                return $result;
+            }
+        }
+        return false;
     }
 
     public function scCatLink($atts, $content = NULL) {
         $atts = shortcode_atts(array(
             'catslug'    => FALSE,
             ), $atts);
-        $replacement = $content;
+        $replacement = false;
 
         if (isset($atts['catslug']) && $atts['catslug']) {
-            global $post;
-
-            $alreadyAssignCat = FALSE;
-            $assignedCats       = wp_get_post_categories($post->ID, array('fields'      => 'ids'));
-            $postCatSlugs = wp_get_post_categories($post->ID, array('fields' => 'slugs'));
-
-            foreach ($postCatSlugs as $slug) {
-                if ($slug === $atts['catslug']) {
-                    $alreadyAssignCat = TRUE;
-                }
-            }
-
-            $assignCat = get_category_by_slug($atts['catslug']);
-            if ($alreadyAssignCat === FALSE) {
-                $assignedCats[] = $assignCat->term_id;
-                $this->assignCat = array(
-                    'postid' => $post->ID,
-                    'cats'   => $assignedCats,
-                );
-            }
-            $replacement = PWP_CatLinks::getLink($assignCat, $replacement);
+            $assignCat   = get_category_by_slug($atts['catslug']);
+            $catlink     = get_category_link($assignCat);
+            $replacement = json_encode(array(
+                'replacement' => "<a href=\"$catlink\">$content</a>",
+                'catid'       => $assignCat->term_id,
+                ));
         }
-
         return $replacement;
     }
 
-}
-
-class PWP_CatLinks{
-    private static $catList = array();
-    public static function getLink($cat, $anchorText){
-        $nofollow = '';
-        if(isset(self::$catList[$cat->term_id])){
-            $nofollow = 'rel="nofollow"';
-        }
-        else{
-            self::$catList[$cat->term_id] = $cat;
-        }
-        $catlink = get_category_link($cat);
-        return "<a href=\"$catlink\" $nofollow>$anchorText</a>";
-    }
 }
