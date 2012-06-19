@@ -33,6 +33,7 @@
   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+require_once(dirname(__FILE__) . '/pwp-filter-plus.php');
 if (!defined('ABSPATH'))
     die();
 define('WFP_DEBUG', false);
@@ -122,7 +123,6 @@ if (!class_exists('WordFilter')) {
                 add_filter('the_content', array($this, 'filter_content'), 200);
                 add_filter('the_title', array($this, 'filter_title'), 200);
                 add_filter('wp_title', array($this, 'filter_title'), 200);
-                add_filter('the_excerpt', array($this, 'filter_content'), 200);
             } elseif ($mode == WFP_MODE_ACTIVE) {
                 // Upon Save Settings
                 add_filter('content_save_pre', array($this, 'filter_content'), 200);
@@ -211,13 +211,11 @@ if (!class_exists('WordFilter')) {
 
             $original = ( $use_regex == 'yes' ) ? $original : preg_quote($original, '/');
 
-            require_once(dirname(__FILE__) . '/pwp-filter-plus.php');
-            $result   = PWP_FilterPlus::getInstance()->doReplacement($original, $replacement, $string, $b, $i);
+            $result = PWP_FilterPlus::getInstance()->doReplacement($original, $replacement, $string, $b, $i, $this->valid_modes(get_option(WFP_OPTION_MODE)) );
 
             if (false === $result) {
                 return preg_replace("/$b$original$b/$i", $replacement, $string);
-            }
-            else{
+            } else {
                 return $result;
             }
         }
